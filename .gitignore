@@ -1,1 +1,491 @@
+Last login: Wed Jun 10 14:28:33 on ttys000
+rayretherford@Rays-MacBook-Air ~ % pwd
+/Users/rayretherford
+rayretherford@Rays-MacBook-Air ~ % cd ~/Desktop/dev/Construction-Automation-Lab
+rayretherford@Rays-MacBook-Air Construction-Automation-Lab % python3 call_log.py
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 1
+
+--- Construction Call Tracker ---
+
+Customer Name: John Smith
+Company: ABC Plumbing
+Phone Number: 5551234567
+Reason for call: Sewer estimate
+
+Status options:
+1. Open
+2. In Progress
+3. Completed
+4. Lost
+Select status (1-4): 1
+
+✅ Call logged successfully!
+
+Press Enter to return to menu...
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 5
+
+--- CONTACT LIST ---
+
+['Name', 'Company', 'Phone']
+['John Smith', 'ABC Plumbing', '5551234567']
+
+Press Enter to return to menu...
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 1
+
+--- Construction Call Tracker ---
+
+Customer Name: John Smith
+Company: ABC Plumbing
+Phone Number: 5551234567
+Reason for call: Water estimate
+
+Status options:
+1. Open
+2. In Progress
+3. Completed
+4. Lost
+Select status (1-4): 1
+
+✅ Call logged successfully!
+
+Press Enter to return to menu...
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 5
+
+--- CONTACT LIST ---
+
+['Name', 'Company', 'Phone']
+['John Smith', 'ABC Plumbing', '5551234567']
+
+Press Enter to return to menu...
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 6
+rayretherford@Rays-MacBook-Air Construction-Automation-Lab % python3 call_log.py
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 1
+
+--- Construction Call Tracker ---
+
+Customer Name: John Smith
+Company: ABC Plumbing
+Phone Number: 551234567
+Reason for call: estimate
+
+Status options:
+1. Open
+2. In Progress
+3. Completed
+4. Lost
+Select status (1-4): 1
+
+✅ Call logged successfully!
+
+Press Enter to return to menu...
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 5
+
+--- CONTACT LIST ---
+
+['Name', 'Company', 'Phone']
+['John Smith', 'ABC Plumbing', '5551234567']
+['John Smith', 'ABC Plumbing', '551234567']
+
+Press Enter to return to menu...
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 6
+rayretherford@Rays-MacBook-Air Construction-Automation-Lab % pwd               
+/Users/rayretherford/Desktop/dev/Construction-Automation-Lab
+rayretherford@Rays-MacBook-Air Construction-Automation-Lab % python3 call_log.py
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 5
+
+--- CONTACT LIST ---
+
+['Name', 'Company', 'Phone']
+['John Smith', 'ABC Plumbing', '5551234567']
+['John Smith', 'ABC Plumbing', '551234567']
+
+Press Enter to return to menu...1
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 1
+
+--- Construction Call Tracker ---
+
+Customer Name: John Smith
+Company: ABC Plumbing
+Phone Number: 5551234567
+Reason for call: zero
+
+Status options:
+1. Open
+2. In Progress
+3. Completed
+4. Lost
+Select status (1-4): 1
+
+✅ Call logged successfully!
+
+Press Enter to return to menu...
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 5
+
+--- CONTACT LIST ---
+
+['Name', 'Company', 'Phone']
+['John Smith', 'ABC Plumbing', '5551234567']
+['John Smith', 'ABC Plumbing', '551234567']
+
+Press Enter to return to menu...
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 6
+rayretherford@Rays-MacBook-Air Construction-Automation-Lab % python3 call_log.py
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 1
+
+--- Construction Call Tracker ---
+
+Customer Name: John Smith
+Company: ABC Plumbing
+Phone Number: 5551234567
+Reason for call: Sewer estimate
+
+Status options:
+1. Open
+2. In Progress
+3. Completed
+4. Lost
+Select status (1-4): 1
+
+✅ Call logged successfully!
+
+Press Enter to return to menu...
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 1
+
+--- Construction Call Tracker ---
+
+Customer Name: John Smith
+Company: ABC Plumbing
+Phone Number: 5551234567
+Reason for call: Water estimate
+
+Status options:
+1. Open
+2. In Progress
+3. Completed
+4. Lost
+Select status (1-4): 1
+
+✅ Call logged successfully!
+
+Press Enter to return to menu...
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 5
+
+--- CONTACT LIST ---
+
+['Name', 'Company', 'Phone']
+['John Smith', 'ABC Plumbing', '5551234567']
+
+Press Enter to return to menu...
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 2
+
+--- OPEN CALLS (WORK QUEUE) ---
+
+Traceback (most recent call last):
+  File "/Users/rayretherford/Desktop/dev/Construction-Automation-Lab/call_log.py", line 263, in <module>
+    main()
+    ~~~~^^
+  File "/Users/rayretherford/Desktop/dev/Construction-Automation-Lab/call_log.py", line 249, in main
+    view_calls()
+    ~~~~~~~~~~^^
+  File "/Users/rayretherford/Desktop/dev/Construction-Automation-Lab/call_log.py", line 102, in view_calls
+    rows = read_rows()
+TypeError: read_rows() missing 1 required positional argument: 'file_path'
+rayretherford@Rays-MacBook-Air Construction-Automation-Lab % 
+rayretherford@Rays-MacBook-Air Construction-Automation-Lab % bash
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$ 
+bash-3.2$ exit
+exit
+rayretherford@Rays-MacBook-Air Construction-Automation-Lab % python3 call_log.py 
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 2
+
+--- OPEN CALLS (WORK QUEUE) ---
+
+['ID', 'Time', 'Name', 'Company', 'Phone', 'Reason', 'Status']
+ID: 1 | Time: 2026-06-10 15:27:24 | Name: John Smith | Company: ABC Plumbing | Phone: 5551234567 | Reason: Sewer estimate | Status: Open
+ID: 2 | Time: 2026-06-10 15:27:59 | Name: John Smith | Company: ABC Plumbing | Phone: 5551234567 | Reason: Water estimate | Status: Open
+
+Press Enter to return to menu...3
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 3
+
+--- SEARCH CALLS ---
+
+Enter phone number to search: 5551234567
+ID: 1 | Time: 2026-06-10 15:27:24 | Name: John Smith | Company: ABC Plumbing | Phone: 5551234567 | Reason: Sewer estimate | Status: Open
+ID: 2 | Time: 2026-06-10 15:27:59 | Name: John Smith | Company: ABC Plumbing | Phone: 5551234567 | Reason: Water estimate | Status: Open
+
+Press Enter to return to menu...
+
+--- Construction Call Menu ---
+
+1. Log new call
+2. View open calls
+3. Search calls
+4. Mark call as completed
+5. View contacts
+6. Exit
+
+Select option: 6
+rayretherford@Rays-MacBook-Air Construction-Automation-Lab % git status
+On branch main
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   call_log.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	__pycache__/
+	call_log.csv
+	contacts.csv
+
+no changes added to commit (use "git add" and/or "git commit -a")
+rayretherford@Rays-MacBook-Air Construction-Automation-Lab % git status
+On branch main
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   call_log.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.DS_Store
+	call_log.csv
+	contacts.csv
+
+no changes added to commit (use "git add" and/or "git commit -a")
+rayretherford@Rays-MacBook-Air Construction-Automation-Lab % git add .
+rayretherford@Rays-MacBook-Air Construction-Automation-Lab % git commit -m "Add ID system, contacts integration, and fix file abstraction layer"
+[main 3b833e0] Add ID system, contacts integration, and fix file abstraction layer
+ Committer: Ray Retherford <rayretherford@Rays-MacBook-Air.local>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly. Run the
+following command and follow the instructions in your editor to edit
+your configuration file:
+
+    git config --global --edit
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+ 4 files changed, 268 insertions(+)
+ create mode 100644 .DS_Store
+ create mode 100644 call_log.csv
+ create mode 100644 contacts.csv
+rayretherford@Rays-MacBook-Air Construction-Automation-Lab % git rm --cached .DS_Store
+rm '.DS_Store'
+rayretherford@Rays-MacBook-Air Construction-Automation-Lab % git rm --cached .DS_Store
+fatal: pathspec '.DS_Store' did not match any files
+rayretherford@Rays-MacBook-Air Construction-Automation-Lab % nano .gitignore
+
+  UW PICO 5.09                            File: .gitignore                             Modified  
+
 .DS_Store
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+^G Get Help     ^O WriteOut     ^R Read File    ^Y Prev Pg      ^K Cut Text     ^C Cur Pos      
+^X Exit         ^J Justify      ^W Where is     ^V Next Pg      ^U UnCut Text   ^T To Spell     
