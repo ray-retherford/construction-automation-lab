@@ -1,17 +1,23 @@
 import csv
-from datetime import datetime, timedelta
+import holidays
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 FILE_NAME = Path("call_log.csv")
 CONTACT_FILE = Path("contacts.csv")
 
-HEADERS = ["ID", "Time", "Name", "Company", "Phone", "Email", "Address", "Job Site", "Reason", "Status", "Scheduled", "Assigned To", "Last Contacted"]
+HEADERS = ["ID", "Time", "Name", "Company", "Phone", "Email", "Address", "Job Site", "Reason", "Status", "Scheduled", "Assigned To", "Last Contacted", "Call Type", "Emergency", "Locate Requested", "Locate Clear Date", "Earliest Dig Date"]
 CONTACT_HEADERS = ["Name", "Company", "Phone", "Email", "Address", "Notes"]
 
 STATUS_COL = 9
 SCHEDULED_COL = 10
 ASSIGNED_TO_COL = 11
 LAST_CONTACTED_COL = 12
+CALL_TYPE_COL = 13
+EMERGENCY_COL = 14
+LOCATE_REQUESTED_COL = 15
+LOCATE_CLEAR_COL = 16
+EARLIEST_DIG_COL = 17
 
 STATUSES = {
     "1": "Open",
@@ -21,6 +27,35 @@ STATUSES = {
 }
 
 ACTIVE_STATUSES = {"Open", "In Progress"}
+
+CALL_TYPES = {
+    "1": "Sewer and Water Install",
+    "2": "Sewer Install",
+    "3": "Water Install",
+    "4": "Septic Install",
+    "5": "Misc. Install",
+    "6": "Bid Work",
+    "7": "Meter Pit Repair",
+    "8": "Small Repair",
+    "9": "Emergency Repair",
+    "10": "Irrigation Install",
+    "11": "Irrigation Repair",
+}
+
+# Call types that always require an 811 locate — the 3-business-day calculation
+# runs automatically, no need to ask.
+AUTO_LOCATE_CALL_TYPES = {
+    "Sewer and Water Install", "Sewer Install", "Water Install",
+    "Septic Install", "Misc. Install", "Irrigation Install",
+}
+
+# Call types where a locate is sometimes needed — ask each time.
+ASK_LOCATE_CALL_TYPES = {
+    "Meter Pit Repair", "Small Repair", "Emergency Repair", "Irrigation Repair",
+}
+
+# Anything not in either set above (e.g. Bid Work) gets no locate logic at all —
+# no digging happens at that stage.
 
 
 def pause():
@@ -98,6 +133,52 @@ def format_scheduled(value: str) -> str:
     return value or "Not scheduled"
 
 
+def add_business_days(start_date: date, num_days: int) -> date:
+    # Advances start_date by num_days business days, skipping weekends and US
+    # federal holidays. This is a legal compliance calculation — Colorado 811
+    # requires utilities to respond within 3 business days of a locate request.
+    # Do not replace with a simple timedelta without verifying 811 rules still hold.
+    us_holidays = holidays.US()
+    current = start_date
+    days_added = 0
+    while days_added < num_days:
+        current += timedelta(days=1)
+        if current.weekday() < 5 and current not in us_holidays:
+            days_added += 1
+    return current
+
+
+def calculate_locate_dates(emergency: str, base_date: date) -> tuple[str, str, str]:
+    # Returns (locate_requested, locate_clear_date, earliest_dig_date) as
+    # YYYY-MM-DD strings, or ("", "", "") when locate doesn't apply.
+    # Whether to call this at all is decided by the caller based on Call Type
+    # (see AUTO_LOCATE_CALL_TYPES / ASK_LOCATE_CALL_TYPES in log_call()) — this
+    # function only knows how to do the date math, not which calls need it.
+    # Locate Clear Date = 3 business days from Locate Requested.
+    # Earliest Dig Date = calendar day after Locate Clear Date (not business day —
+    # the crew can start digging the morning after utilities are marked, even on Monday
+    # after a Friday clear date).
+    # The Emergency flag (separate from the "Emergency Repair" Call Type) bypasses
+    # locate timing entirely, regardless of Call Type, since digging can start immediately.
+    if emergency.upper() == "Y":
+        return "", "", ""
+    locate_clear = add_business_days(base_date, 3)
+    earliest_dig = locate_clear + timedelta(days=1)
+    return (
+        base_date.strftime("%Y-%m-%d"),
+        locate_clear.strftime("%Y-%m-%d"),
+        earliest_dig.strftime("%Y-%m-%d"),
+    )
+
+
+def prompt_call_type() -> str:
+    print("\nCall Type:")
+    for key, label in CALL_TYPES.items():
+        print(f"{key}. {label}")
+    choice = input("Select call type (1-11): ").strip()
+    return CALL_TYPES.get(choice, "")
+
+
 def format_call_line(row: list[str]) -> str:
     row = pad_row(row)
     scheduled = format_scheduled(row[SCHEDULED_COL])
@@ -115,7 +196,7 @@ def format_call_line(row: list[str]) -> str:
 
 def format_call_detail(row: list[str]) -> str:
     row = pad_row(row)
-    return "\n".join([
+    lines = [
         f"ID: {row[0]}",
         f"Date: {row[1]}",
         f"Name: {row[2]}",
@@ -129,7 +210,18 @@ def format_call_detail(row: list[str]) -> str:
         f"Scheduled: {format_scheduled(row[SCHEDULED_COL])}",
         f"Assigned To: {row[ASSIGNED_TO_COL]}",
         f"Last Contacted: {row[LAST_CONTACTED_COL]}",
-    ])
+    ]
+    if row[CALL_TYPE_COL]:
+        lines.append(f"Call Type: {row[CALL_TYPE_COL]}")
+    if row[EMERGENCY_COL]:
+        lines.append(f"Emergency: {row[EMERGENCY_COL]}")
+    if row[LOCATE_REQUESTED_COL]:
+        lines.append(f"Locate Requested: {row[LOCATE_REQUESTED_COL]}")
+    if row[LOCATE_CLEAR_COL]:
+        lines.append(f"Locate Clear Date: {row[LOCATE_CLEAR_COL]}")
+    if row[EARLIEST_DIG_COL]:
+        lines.append(f"Earliest Dig Date: {row[EARLIEST_DIG_COL]}")
+    return "\n".join(lines)
 
 
 def prompt_scheduled() -> str:
@@ -339,6 +431,11 @@ def create_call_record(
     reason: str,
     status: str,
     scheduled: str,
+    call_type: str = "",
+    emergency: str = "",
+    locate_requested: str = "",
+    locate_clear: str = "",
+    earliest_dig: str = "",
 ) -> list[str]:
     row = [
         str(generate_id()),
@@ -352,8 +449,13 @@ def create_call_record(
         reason,
         status,
         scheduled,
-        "",  # Assigned To
-        "",  # Last Contacted
+        "",              # Assigned To
+        "",              # Last Contacted
+        call_type,
+        emergency,
+        locate_requested,
+        locate_clear,
+        earliest_dig,
     ]
 
     file_exists = FILE_NAME.exists()
@@ -414,12 +516,30 @@ def log_call():
 
     address = input("Address: ")
     reason = input("Reason for call: ")
+    call_type = prompt_call_type()
+    emergency = input("Emergency (Y/N): ").strip().upper()
     status = prompt_status()
 
     schedule = input("\nSchedule follow-up? (y/n): ").lower().strip()
     scheduled = prompt_scheduled() if schedule == "y" else ""
 
-    create_call_record(phone, name, company, email, address, job_site, reason, status, scheduled)
+    today = datetime.now().date()
+    if call_type in AUTO_LOCATE_CALL_TYPES:
+        locate_requested, locate_clear, earliest_dig = calculate_locate_dates(emergency, today)
+    elif call_type in ASK_LOCATE_CALL_TYPES:
+        needs_locate = input("Does this need a locate? (y/n): ").lower().strip()
+        if needs_locate == "y":
+            locate_requested, locate_clear, earliest_dig = calculate_locate_dates(emergency, today)
+        else:
+            locate_requested, locate_clear, earliest_dig = "", "", ""
+    else:
+        # e.g. Bid Work — no digging happens at this stage, no locate logic at all
+        locate_requested, locate_clear, earliest_dig = "", "", ""
+
+    create_call_record(
+        phone, name, company, email, address, job_site, reason, status, scheduled,
+        call_type, emergency, locate_requested, locate_clear, earliest_dig,
+    )
 
     print("\n✅ Call logged successfully!")
     pause()
