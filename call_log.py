@@ -5,11 +5,13 @@ from pathlib import Path
 FILE_NAME = Path("call_log.csv")
 CONTACT_FILE = Path("contacts.csv")
 
-HEADERS = ["ID", "Time", "Name", "Company", "Phone", "Reason", "Status", "Scheduled"]
-CONTACT_HEADERS = ["Name", "Company", "Phone"]
+HEADERS = ["ID", "Time", "Name", "Company", "Phone", "Email", "Address", "Job Site", "Reason", "Status", "Scheduled", "Assigned To", "Last Contacted"]
+CONTACT_HEADERS = ["Name", "Company", "Phone", "Email", "Address", "Notes"]
 
-STATUS_COL = 6
-SCHEDULED_COL = 7
+STATUS_COL = 9
+SCHEDULED_COL = 10
+ASSIGNED_TO_COL = 11
+LAST_CONTACTED_COL = 12
 
 STATUSES = {
     "1": "Open",
@@ -105,7 +107,7 @@ def format_call_line(row: list[str]) -> str:
         f"Name: {row[2]} | "
         f"Company: {row[3]} | "
         f"Phone: {row[4]} | "
-        f"Reason: {row[5]} | "
+        f"Reason: {row[8]} | "
         f"Status: {row[STATUS_COL]} | "
         f"Scheduled: {scheduled}"
     )
@@ -119,9 +121,14 @@ def format_call_detail(row: list[str]) -> str:
         f"Name: {row[2]}",
         f"Company: {row[3]}",
         f"Phone: {row[4]}",
-        f"Reason: {row[5]}",
+        f"Email: {row[5]}",
+        f"Address: {row[6]}",
+        f"Job Site: {row[7]}",
+        f"Reason: {row[8]}",
         f"Status: {row[STATUS_COL]}",
         f"Scheduled: {format_scheduled(row[SCHEDULED_COL])}",
+        f"Assigned To: {row[ASSIGNED_TO_COL]}",
+        f"Last Contacted: {row[LAST_CONTACTED_COL]}",
     ])
 
 
@@ -259,7 +266,7 @@ def find_contact_index(phone: str):
     return None
 
 
-def add_contact(name: str, company: str, phone: str) -> None:
+def add_contact(name: str, company: str, phone: str, email: str = "", address: str = "") -> None:
     clean_phone = normalize_phone(phone)
     for row in read_contacts():
         if row and len(row) >= 3 and normalize_phone(row[2]) == clean_phone:
@@ -270,17 +277,19 @@ def add_contact(name: str, company: str, phone: str) -> None:
         writer = csv.writer(file)
         if not file_exists:
             writer.writerow(CONTACT_HEADERS)
-        writer.writerow([name, company, phone])
+        writer.writerow([name, company, phone, email, address, ""])
 
 
-def update_contact(name: str, company: str, phone: str) -> None:
+def update_contact(name: str, company: str, phone: str, email: str = "", address: str = "") -> None:
     contacts = read_contacts()
     index = find_contact_index(phone)
 
     if index is not None:
-        contacts[index] = [name, company, phone]
+        existing = contacts[index]
+        notes = existing[5] if len(existing) > 5 else ""
+        contacts[index] = [name, company, phone, email, address, notes]
     else:
-        contacts.append([name, company, phone])
+        contacts.append([name, company, phone, email, address, ""])
 
     if contacts and contacts[0] != CONTACT_HEADERS:
         contacts.insert(0, CONTACT_HEADERS)
@@ -299,27 +308,52 @@ def write_contacts(rows: list[list[str]]) -> None:
         csv.writer(file).writerows(rows)
 
 
-def log_call():
-    print("\n--- Construction Call Tracker ---\n")
+def find_or_create_contact(phone: str) -> dict | None:
+    contacts = read_contacts()
+    index = find_contact_index(phone)
+    if index is None:
+        return None
+    saved = contacts[index]
+    return {
+        "name":    saved[0] if len(saved) > 0 else "",
+        "company": saved[1] if len(saved) > 1 else "",
+        "email":   saved[3] if len(saved) > 3 else "",
+    }
 
-    name = input("Customer Name: ")
-    company = input("Company: ")
-    phone = input("Phone Number: ")
-    reason = input("Reason for call: ")
-    status = prompt_status()
 
-    schedule = input("\nSchedule follow-up? (y/n): ").lower().strip()
-    scheduled = prompt_scheduled() if schedule == "y" else ""
+def find_prior_job_site(phone: str) -> str:
+    prior_calls = [
+        r for r in get_call_rows()
+        if normalize_phone(r[4]) == normalize_phone(phone) and pad_row(r)[7]
+    ]
+    return pad_row(prior_calls[-1])[7] if prior_calls else ""
 
+
+def create_call_record(
+    phone: str,
+    name: str,
+    company: str,
+    email: str,
+    address: str,
+    job_site: str,
+    reason: str,
+    status: str,
+    scheduled: str,
+) -> list[str]:
     row = [
         str(generate_id()),
         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         name,
         company,
         phone,
+        email,
+        address,
+        job_site,
         reason,
         status,
         scheduled,
+        "",  # Assigned To
+        "",  # Last Contacted
     ]
 
     file_exists = FILE_NAME.exists()
@@ -329,7 +363,63 @@ def log_call():
             writer.writerow(HEADERS)
         writer.writerow(row)
 
-    add_contact(name, company, phone)
+    add_contact(name, company, phone, email, address)
+    return row
+
+
+def log_call():
+    print("\n--- Construction Call Tracker ---\n")
+
+    phone = input("Phone Number: ")
+
+    saved_contact = find_or_create_contact(phone)
+
+    if saved_contact is not None:
+        print(f"\nFound contact:")
+        print(f"  Name:    {saved_contact['name']}")
+        print(f"  Company: {saved_contact['company']}")
+        print(f"  Email:   {saved_contact['email']}")
+
+        use = input("\nUse this info? (y/n): ").lower().strip()
+
+        if use == "y":
+            name    = saved_contact["name"]
+            company = saved_contact["company"]
+            email   = saved_contact["email"]
+        else:
+            print("\nWhat changed? (press Enter to keep saved value)")
+            val = input(f"Name [{saved_contact['name']}]: ").strip()
+            name = val if val else saved_contact["name"]
+
+            val = input(f"Company [{saved_contact['company']}]: ").strip()
+            company = val if val else saved_contact["company"]
+
+            val = input(f"Email [{saved_contact['email']}]: ").strip()
+            email = val if val else saved_contact["email"]
+    else:
+        name    = input("Customer Name: ")
+        company = input("Company: ")
+        email   = input("Email: ")
+
+    job_site = ""
+    if saved_contact is not None:
+        prior_job_site = find_prior_job_site(phone)
+        if prior_job_site:
+            same = input(f"Job Site: [{prior_job_site}] — same job site? (y/n): ").lower().strip()
+            if same == "y":
+                job_site = prior_job_site
+
+    if not job_site:
+        job_site = input("Job Site: ")
+
+    address = input("Address: ")
+    reason = input("Reason for call: ")
+    status = prompt_status()
+
+    schedule = input("\nSchedule follow-up? (y/n): ").lower().strip()
+    scheduled = prompt_scheduled() if schedule == "y" else ""
+
+    create_call_record(phone, name, company, email, address, job_site, reason, status, scheduled)
 
     print("\n✅ Call logged successfully!")
     pause()
@@ -424,11 +514,15 @@ def edit_call():
     print("1. Name")
     print("2. Company")
     print("3. Phone")
-    print("4. Reason")
-    print("5. Status")
-    print("6. Mark as Completed")
-    print("7. Set Schedule")
-    print("8. Cancel")
+    print("4. Email")
+    print("5. Address")
+    print("6. Job Site")
+    print("7. Reason")
+    print("8. Status")
+    print("9. Mark as Completed")
+    print("10. Set Schedule")
+    print("11. Assigned To")
+    print("12. Cancel")
 
     action = input("\nSelect option: ")
 
@@ -439,25 +533,34 @@ def edit_call():
     elif action == "3":
         row[4] = input("Enter new phone: ")
     elif action == "4":
-        row[5] = input("Enter new reason: ")
+        row[5] = input("Enter new email: ")
     elif action == "5":
+        row[6] = input("Enter new address: ")
+    elif action == "6":
+        row[7] = input("Enter new job site: ")
+    elif action == "7":
+        row[8] = input("Enter new reason: ")
+    elif action == "8":
         row = pad_row(row)
         row[STATUS_COL] = prompt_status()
-    elif action == "6":
+    elif action == "9":
         row = pad_row(row)
         row[STATUS_COL] = "Completed"
         write_rows(rows)
         print("\n✅ Call marked as Completed!")
         pause()
         return
-    elif action == "7":
+    elif action == "10":
         row = pad_row(row)
         row[SCHEDULED_COL] = prompt_scheduled()
         write_rows(rows)
         print("\n✅ Schedule updated!")
         pause()
         return
-    elif action == "8":
+    elif action == "11":
+        row = pad_row(row)
+        row[11] = input("Assign to: ")
+    elif action == "12":
         pause()
         return
     else:
@@ -470,7 +573,7 @@ def edit_call():
 
     sync = input("\nUpdate contact phonebook too? (y/n): ").lower().strip()
     if sync == "y":
-        update_contact(row[2], row[3], row[4])
+        update_contact(row[2], row[3], row[4], row[5], row[6])
         print("✅ Contact updated!")
 
     pause()
@@ -605,7 +708,8 @@ def view_contacts():
     for row in contacts:
         if len(row) < 3:
             continue
-        print(f"Name: {row[0]} | Company: {row[1]} | Phone: {row[2]}")
+        email = row[3] if len(row) > 3 else ""
+        print(f"Name: {row[0]} | Company: {row[1]} | Phone: {row[2]} | Email: {email}")
 
     pause()
 
@@ -623,7 +727,8 @@ def search_contacts():
     matches = search_in_rows(contacts, query)
     if matches:
         for row in matches:
-            print(f"Name: {row[0]} | Company: {row[1]} | Phone: {row[2]}")
+            email = row[3] if len(row) > 3 else ""
+            print(f"Name: {row[0]} | Company: {row[1]} | Phone: {row[2]} | Email: {email}")
     else:
         print("No matching contacts found.")
 
@@ -668,7 +773,10 @@ def edit_contact():
     print("1. Name")
     print("2. Company")
     print("3. Phone")
-    print("4. Cancel")
+    print("4. Email")
+    print("5. Address")
+    print("6. Notes")
+    print("7. Cancel")
 
     action = input("\nSelect option: ")
 
@@ -679,6 +787,18 @@ def edit_contact():
     elif action == "3":
         selected[2] = input("New phone: ")
     elif action == "4":
+        while len(selected) < 4:
+            selected.append("")
+        selected[3] = input("New email: ")
+    elif action == "5":
+        while len(selected) < 5:
+            selected.append("")
+        selected[4] = input("New address: ")
+    elif action == "6":
+        while len(selected) < 6:
+            selected.append("")
+        selected[5] = input("New notes: ")
+    elif action == "7":
         pause()
         return
     else:
