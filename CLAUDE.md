@@ -21,7 +21,7 @@ minimal manual entry.
 - call_log.csv — persistent call records
 - contacts.csv — customer/company phonebook synced from call logs
 - employees.csv (planned) — Name, Role (Operator/Labor), Default Partner
-- job_sites.csv (planned) — Job Site, City/Area lookup
+- job_sites.csv (planned) — Project, City/Area lookup
 
 # Commands
 
@@ -65,7 +65,7 @@ minimal manual entry.
   types trigger automatic vs ask-each-time vs no locate logic.
 
 - **Contract vs Custom installs**: Contract work = 2 addresses per crew, same project,
-  completed same-day (dig, install, inspect, backfill) — tracked via a shared Project Group
+  completed same-day (dig, install, inspect, backfill) — tracked via a shared Project field
   so both addresses share a Scheduled date. Custom work = 1-3+ days, tracked via Estimated
   Duration (business days only, weekends skipped) with an auto-calculated Estimated End Date.
 
@@ -125,8 +125,8 @@ Phase 1 (done): Terminal call logger with contacts, scheduling, and dashboard
 Phase 1.5 (done): Refactored log_call() into create_call_record() and
   find_or_create_contact() — pure logic, no input()/print(), so the same engine can be
   triggered by Terminal, a future voice agent, or automated Sheets sync
-Phase 2 (in progress): Contact + Job Site auto-fill by phone, Call Type, Emergency flag,
-  811 locate date calculations, Contract/Custom install scheduling with Project Group and
+Phase 2 (in progress): Contact + Project auto-fill by phone, Call Type, Emergency flag,
+  811 locate date calculations, Contract/Custom install scheduling with Project and
   Estimated Duration
 Phase 2 (next): employees.csv and job_sites.csv, Dispatch view grouped by City/Area
 Phase 3: Google Sheets sync — push Master Schedule (New Installs / Repairs) and pull
@@ -151,7 +151,14 @@ When compacting, preserve:
 - Contact auto-fill only covers Name, Company, Email — Address was removed from this flow
   since it's not meaningful in this industry (customers are supervisors/warranty contacts,
   not billing relationships)
-- Job Site auto-fill pulls from the most recent call record for that phone number, not from
-  the contact record — Job Site and Address are separate concepts (project vs specific lot)
+- Project auto-fill pulls from the most recent call record for that phone number (or from
+  searching existing Projects), not from the contact record — Project and Address are
+  separate concepts: Project identifies the job (may be shared across multiple addresses
+  for Contract work), Address is the specific location for this call
 - Address is always asked fresh every call, never auto-filled, since it changes constantly
-  even when Job Site stays the same
+  even when Project stays the same
+- Job Site and Project Group were merged into a single "Project" field — one field now
+  covers both "which job site is this" and "which project group does this call belong to."
+  Contract's Scheduled-date sync only fires when Job Category is Contract AND the Project
+  matched an existing call; Custom and repairs can reuse a Project name without ever
+  syncing the schedule

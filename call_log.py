@@ -6,9 +6,14 @@ from pathlib import Path
 FILE_NAME = Path("call_log.csv")
 CONTACT_FILE = Path("contacts.csv")
 
-HEADERS = ["ID", "Time", "Name", "Company", "Phone", "Email", "Address", "Job Site", "Reason", "Status", "Scheduled", "Assigned To", "Last Contacted", "Call Type", "Emergency", "Locate Requested", "Locate Clear Date", "Earliest Dig Date"]
+# TODO(job_sites.csv): Project names must be unique across the whole company, not
+# just per city — two subdivisions in different towns must not share a name, or the
+# City lookup will return the wrong result. Not enforced yet since job_sites.csv
+# doesn't exist; revisit when that file and its City/Area lookup are built.
+HEADERS = ["ID", "Time", "Name", "Company", "Phone", "Email", "Address", "Project", "Reason", "Status", "Scheduled", "Assigned To", "Last Contacted", "Call Type", "Emergency", "Locate Requested", "Locate Clear Date", "Earliest Dig Date", "Job Category", "Estimated Duration", "Estimated End Date"]
 CONTACT_HEADERS = ["Name", "Company", "Phone", "Email", "Address", "Notes"]
 
+PROJECT_COL = 7
 STATUS_COL = 9
 SCHEDULED_COL = 10
 ASSIGNED_TO_COL = 11
@@ -18,6 +23,9 @@ EMERGENCY_COL = 14
 LOCATE_REQUESTED_COL = 15
 LOCATE_CLEAR_COL = 16
 EARLIEST_DIG_COL = 17
+JOB_CATEGORY_COL = 18
+ESTIMATED_DURATION_COL = 19
+ESTIMATED_END_DATE_COL = 20
 
 STATUSES = {
     "1": "Open",
@@ -57,6 +65,11 @@ ASK_LOCATE_CALL_TYPES = {
 # Anything not in either set above (e.g. Bid Work) gets no locate logic at all —
 # no digging happens at that stage.
 
+JOB_CATEGORIES = {
+    "1": "Contract",
+    "2": "Custom",
+}
+
 
 def pause():
     input("\nPress Enter to return to menu...")
@@ -78,6 +91,15 @@ def write_rows(rows: list[list[str]]) -> None:
 
 def normalize_phone(phone: str) -> str:
     return phone.replace("-", "").replace(" ", "")
+
+
+def prompt_phone(prompt_text: str) -> str:
+    while True:
+        phone = input(prompt_text)
+        digits = normalize_phone(phone)
+        if digits.isdigit() and len(digits) == 10:
+            return phone
+        print("Phone number must be 10 digits.")
 
 
 def pad_row(row: list[str]) -> list[str]:
@@ -179,6 +201,20 @@ def prompt_call_type() -> str:
     return CALL_TYPES.get(choice, "")
 
 
+def prompt_job_category() -> str:
+    # Job Category only applies to the auto-locate install types.
+    # Contract = 2 addresses per crew, same project, completed same-day (dig,
+    # install, inspect, backfill) — tracked via a shared Project so both
+    # addresses share one Scheduled date.
+    # Custom = a single install spanning 1-3+ days, tracked via Estimated
+    # Duration (business days) with an auto-calculated Estimated End Date.
+    print("\nJob Category:")
+    for key, label in JOB_CATEGORIES.items():
+        print(f"{key}. {label}")
+    choice = input("Select job category (1-2): ").strip()
+    return JOB_CATEGORIES.get(choice, "")
+
+
 def format_call_line(row: list[str]) -> str:
     row = pad_row(row)
     scheduled = format_scheduled(row[SCHEDULED_COL])
@@ -196,31 +232,26 @@ def format_call_line(row: list[str]) -> str:
 
 def format_call_detail(row: list[str]) -> str:
     row = pad_row(row)
-    lines = [
-        f"ID: {row[0]}",
-        f"Date: {row[1]}",
-        f"Name: {row[2]}",
-        f"Company: {row[3]}",
-        f"Phone: {row[4]}",
-        f"Email: {row[5]}",
-        f"Address: {row[6]}",
-        f"Job Site: {row[7]}",
-        f"Reason: {row[8]}",
-        f"Status: {row[STATUS_COL]}",
-        f"Scheduled: {format_scheduled(row[SCHEDULED_COL])}",
-        f"Assigned To: {row[ASSIGNED_TO_COL]}",
-        f"Last Contacted: {row[LAST_CONTACTED_COL]}",
-    ]
-    if row[CALL_TYPE_COL]:
-        lines.append(f"Call Type: {row[CALL_TYPE_COL]}")
-    if row[EMERGENCY_COL]:
-        lines.append(f"Emergency: {row[EMERGENCY_COL]}")
-    if row[LOCATE_REQUESTED_COL]:
-        lines.append(f"Locate Requested: {row[LOCATE_REQUESTED_COL]}")
-    if row[LOCATE_CLEAR_COL]:
-        lines.append(f"Locate Clear Date: {row[LOCATE_CLEAR_COL]}")
-    if row[EARLIEST_DIG_COL]:
-        lines.append(f"Earliest Dig Date: {row[EARLIEST_DIG_COL]}")
+    lines = []
+
+    for i, header in enumerate(HEADERS):
+        value = row[i]
+        label = "Date" if header == "Time" else header
+
+        if header == "Scheduled":
+            # Always shown — format_scheduled() returns a "Not scheduled" placeholder
+            # for a blank value rather than an empty string, so this isn't skipped.
+            lines.append(f"{label}: {format_scheduled(value)}")
+            continue
+
+        if not value:
+            continue
+
+        if header == "Estimated Duration":
+            value = f"{value} day(s)"
+
+        lines.append(f"{label}: {value}")
+
     return "\n".join(lines)
 
 
@@ -413,12 +444,12 @@ def find_or_create_contact(phone: str) -> dict | None:
     }
 
 
-def find_prior_job_site(phone: str) -> str:
+def find_prior_project(phone: str) -> list[str] | None:
     prior_calls = [
         r for r in get_call_rows()
-        if normalize_phone(r[4]) == normalize_phone(phone) and pad_row(r)[7]
+        if normalize_phone(r[4]) == normalize_phone(phone) and pad_row(r)[PROJECT_COL]
     ]
-    return pad_row(prior_calls[-1])[7] if prior_calls else ""
+    return pad_row(prior_calls[-1]) if prior_calls else None
 
 
 def create_call_record(
@@ -427,7 +458,7 @@ def create_call_record(
     company: str,
     email: str,
     address: str,
-    job_site: str,
+    project: str,
     reason: str,
     status: str,
     scheduled: str,
@@ -436,6 +467,9 @@ def create_call_record(
     locate_requested: str = "",
     locate_clear: str = "",
     earliest_dig: str = "",
+    job_category: str = "",
+    estimated_duration: str = "",
+    estimated_end_date: str = "",
 ) -> list[str]:
     row = [
         str(generate_id()),
@@ -445,7 +479,7 @@ def create_call_record(
         phone,
         email,
         address,
-        job_site,
+        project,
         reason,
         status,
         scheduled,
@@ -456,6 +490,9 @@ def create_call_record(
         locate_requested,
         locate_clear,
         earliest_dig,
+        job_category,
+        estimated_duration,
+        estimated_end_date,
     ]
 
     file_exists = FILE_NAME.exists()
@@ -472,7 +509,7 @@ def create_call_record(
 def log_call():
     print("\n--- Construction Call Tracker ---\n")
 
-    phone = input("Phone Number: ")
+    phone = prompt_phone("Phone Number: ")
 
     saved_contact = find_or_create_contact(phone)
 
@@ -503,16 +540,50 @@ def log_call():
         company = input("Company: ")
         email   = input("Email: ")
 
-    job_site = ""
-    if saved_contact is not None:
-        prior_job_site = find_prior_job_site(phone)
-        if prior_job_site:
-            same = input(f"Job Site: [{prior_job_site}] — same job site? (y/n): ").lower().strip()
-            if same == "y":
-                job_site = prior_job_site
+    # Project auto-fill applies to every Call Type, not just installs. It also
+    # tracks whether the Project matched an existing call — and that call's
+    # Scheduled date — so Contract jobs can sync their schedule to it later.
+    project = ""
+    linked_scheduled = ""
 
-    if not job_site:
-        job_site = input("Job Site: ")
+    if saved_contact is not None:
+        prior_call = find_prior_project(phone)
+        if prior_call:
+            prior_project = prior_call[PROJECT_COL]
+            same = input(f"Same project — {prior_project}? (y/n): ").lower().strip()
+            if same == "y":
+                project = prior_project
+                linked_scheduled = prior_call[SCHEDULED_COL]
+
+    if not project:
+        search = input("Search existing projects? (y/n): ").lower().strip()
+        if search == "y":
+            query = input("Search Project: ").lower().strip()
+            matches = search_in_rows(
+                [r for r in get_call_rows() if pad_row(r)[PROJECT_COL]], query
+            )
+
+            if matches:
+                print("\nMatching Projects:\n")
+                for i, r in enumerate(matches, start=1):
+                    r = pad_row(r)
+                    print(
+                        f"{i}. ID:{r[0]} | {r[2]} | "
+                        f"Project: {r[PROJECT_COL]} | "
+                        f"Scheduled: {format_scheduled(r[SCHEDULED_COL])}"
+                    )
+                choice = input("\nSelect a project: ")
+                if choice.isdigit() and 1 <= int(choice) <= len(matches):
+                    linked = pad_row(matches[int(choice) - 1])
+                    project = linked[PROJECT_COL]
+                    linked_scheduled = linked[SCHEDULED_COL]
+                else:
+                    print("\nInvalid selection.")
+            else:
+                print("\nNo matching projects found.")
+
+    if not project:
+        project = input("Project: ")
 
     address = input("Address: ")
     reason = input("Reason for call: ")
@@ -527,7 +598,7 @@ def log_call():
     if call_type in AUTO_LOCATE_CALL_TYPES:
         locate_requested, locate_clear, earliest_dig = calculate_locate_dates(emergency, today)
     elif call_type in ASK_LOCATE_CALL_TYPES:
-        needs_locate = input("Does this need a locate? (y/n): ").lower().strip()
+        needs_locate = input("Does this repair need a locate? (y/n): ").lower().strip()
         if needs_locate == "y":
             locate_requested, locate_clear, earliest_dig = calculate_locate_dates(emergency, today)
         else:
@@ -536,9 +607,43 @@ def log_call():
         # e.g. Bid Work — no digging happens at this stage, no locate logic at all
         locate_requested, locate_clear, earliest_dig = "", "", ""
 
+    job_category = ""
+    estimated_duration = ""
+    estimated_end_date = ""
+
+    if call_type in AUTO_LOCATE_CALL_TYPES:
+        job_category = prompt_job_category()
+
+        if job_category == "Contract" and linked_scheduled:
+            # Contract: 2 addresses per crew, same project, completed same-day.
+            # Both addresses share one Project and the same Scheduled date, so a
+            # Contract call that matched an existing Project inherits that
+            # Project's Scheduled date instead of using whatever was entered above.
+            # This sync is Contract-only — Custom installs and repairs that reuse
+            # a Project name never have their Scheduled date overwritten this way.
+            scheduled = linked_scheduled
+
+        elif job_category == "Custom":
+            # Custom: a single install spanning 1-3+ days. Estimated Duration is
+            # business days (weekends skipped); Estimated End Date is calculated
+            # from the Scheduled start date using the same add_business_days()
+            # math as locates — a duration of 1 means the job starts and ends
+            # the same day, so 0 additional business days are added.
+            duration_input = input("Estimated Duration (business days, blank for 1): ").strip()
+            try:
+                duration = int(duration_input) if duration_input else 1
+            except ValueError:
+                duration = 1
+            estimated_duration = str(duration)
+
+            start = parse_scheduled(scheduled)
+            if start:
+                estimated_end_date = add_business_days(start.date(), duration - 1).strftime("%Y-%m-%d")
+
     create_call_record(
-        phone, name, company, email, address, job_site, reason, status, scheduled,
+        phone, name, company, email, address, project, reason, status, scheduled,
         call_type, emergency, locate_requested, locate_clear, earliest_dig,
+        job_category, estimated_duration, estimated_end_date,
     )
 
     print("\n✅ Call logged successfully!")
@@ -636,7 +741,7 @@ def edit_call():
     print("3. Phone")
     print("4. Email")
     print("5. Address")
-    print("6. Job Site")
+    print("6. Project")
     print("7. Reason")
     print("8. Status")
     print("9. Mark as Completed")
@@ -651,13 +756,13 @@ def edit_call():
     elif action == "2":
         row[3] = input("Enter new company: ")
     elif action == "3":
-        row[4] = input("Enter new phone: ")
+        row[4] = prompt_phone("Enter new phone: ")
     elif action == "4":
         row[5] = input("Enter new email: ")
     elif action == "5":
         row[6] = input("Enter new address: ")
     elif action == "6":
-        row[7] = input("Enter new job site: ")
+        row[PROJECT_COL] = input("Enter new project: ")
     elif action == "7":
         row[8] = input("Enter new reason: ")
     elif action == "8":
@@ -905,7 +1010,7 @@ def edit_contact():
     elif action == "2":
         selected[1] = input("New company: ")
     elif action == "3":
-        selected[2] = input("New phone: ")
+        selected[2] = prompt_phone("New phone: ")
     elif action == "4":
         while len(selected) < 4:
             selected.append("")
