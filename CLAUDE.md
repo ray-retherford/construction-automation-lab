@@ -8,7 +8,7 @@ minimal manual entry.
 # Stack
 
 - Language: Python 3.11+
-- Data: CSV files (call_log.csv, contacts.csv). Planned: employees.csv, job_sites.csv
+- Data: CSV files (call_log.csv, contacts.csv, employees.csv, project_sites.csv)
 - Interface: Terminal menu (expanding toward Google Sheets sync and AI layer)
 - Dependencies: stdlib only, EXCEPT the `holidays` library — approved exception, used for
   accurate US federal holiday calculation in locate date math. This is a legal compliance
@@ -20,8 +20,9 @@ minimal manual entry.
 - call_log.py — main app, all logic lives here for now
 - call_log.csv — persistent call records
 - contacts.csv — customer/company phonebook synced from call logs
-- employees.csv (planned) — Name, Role (Operator/Labor), Default Partner
-- job_sites.csv (planned) — Project, City/Area lookup
+- employees.csv — Name, Role (Operator/Labor), Default Partner (soft hint, not enforced)
+- project_sites.csv — Project, City/Area lookup; a Project is only asked for its
+  City/Area once, the first time it's used in log_call()
 
 # Commands
 
@@ -125,12 +126,15 @@ Phase 1 (done): Terminal call logger with contacts, scheduling, and dashboard
 Phase 1.5 (done): Refactored log_call() into create_call_record() and
   find_or_create_contact() — pure logic, no input()/print(), so the same engine can be
   triggered by Terminal, a future voice agent, or automated Sheets sync
-Phase 2 (in progress): Contact + Project auto-fill by phone, Call Type, Emergency flag,
+Phase 2 (done): Contact + Project auto-fill by phone, Call Type, Source, Emergency flag,
   811 locate date calculations, Contract/Custom install scheduling with Project and
-  Estimated Duration
-Phase 2 (next): employees.csv and job_sites.csv, Dispatch view grouped by City/Area
+  Estimated Duration, employees.csv (Employee Manager), project_sites.csv (City/Area
+  lookup), and a Dispatch view grouped by City/Area for end-of-day crew planning
 Phase 3: Google Sheets sync — push Master Schedule (New Installs / Repairs) and pull
-  Google Forms field employee reporting (Address, Parts Used, Labor Hours, Notes, Pictures)
+  Google Forms field employee reporting (Address, Parts Used, Labor Hours, Notes, Pictures).
+  Also includes Gmail parsing for incoming call/order sources: customer emails, municipality
+  emails, and SupplyPro order emails — SupplyPro delivers contract work orders via email
+  (not a live API), so this is an email-parsing task, not a separate integration.
 Phase 4: Web dashboard — replace terminal menu with a simple browser UI
 Phase 5: AI agent layer — answer phone, create call record, assign schedule, send texts,
   update Sheets
@@ -151,14 +155,12 @@ When compacting, preserve:
 - Contact auto-fill only covers Name, Company, Email — Address was removed from this flow
   since it's not meaningful in this industry (customers are supervisors/warranty contacts,
   not billing relationships)
-- Project auto-fill pulls from the most recent call record for that phone number (or from
-  searching existing Projects), not from the contact record — Project and Address are
-  separate concepts: Project identifies the job (may be shared across multiple addresses
-  for Contract work), Address is the specific location for this call
+- Project auto-fill pulls from the most recent call record for that phone number, not from
+  the contact record — Project and Address are separate concepts (project vs specific lot)
 - Address is always asked fresh every call, never auto-filled, since it changes constantly
   even when Project stays the same
-- Job Site and Project Group were merged into a single "Project" field — one field now
-  covers both "which job site is this" and "which project group does this call belong to."
-  Contract's Scheduled-date sync only fires when Job Category is Contract AND the Project
-  matched an existing call; Custom and repairs can reuse a Project name without ever
-  syncing the schedule
+- Source field tracks how each call came in (Phone, Text, Email) — added for future
+  lead-source reporting as the industry shifts. SupplyPro orders arrive via Email, so they
+  don't get a separate Source option. Website and Word of Mouth leads are folded into
+  Phone/Text since they typically come in as the boss relaying them by call or text, not
+  through their own channel.
