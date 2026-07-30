@@ -5,13 +5,17 @@ from pathlib import Path
 
 FILE_NAME = Path("call_log.csv")
 CONTACT_FILE = Path("contacts.csv")
+EMPLOYEE_FILE = Path("employees.csv")
+PROJECT_SITES_FILE = Path("project_sites.csv")
 
 # TODO(job_sites.csv): Project names must be unique across the whole company, not
 # just per city — two subdivisions in different towns must not share a name, or the
 # City lookup will return the wrong result. Not enforced yet since job_sites.csv
 # doesn't exist; revisit when that file and its City/Area lookup are built.
-HEADERS = ["ID", "Time", "Name", "Company", "Phone", "Email", "Address", "Project", "Reason", "Status", "Scheduled", "Assigned To", "Last Contacted", "Call Type", "Emergency", "Locate Requested", "Locate Clear Date", "Earliest Dig Date", "Job Category", "Estimated Duration", "Estimated End Date"]
+HEADERS = ["ID", "Time", "Name", "Company", "Phone", "Email", "Address", "Project", "Notes", "Status", "Scheduled", "Assigned To", "Last Contacted", "Call Type", "Source", "Emergency", "Locate Requested", "Locate Clear Date", "Earliest Dig Date", "Job Category", "Estimated Duration", "Estimated End Date"]
 CONTACT_HEADERS = ["Name", "Company", "Phone", "Email", "Address", "Notes"]
+EMPLOYEE_HEADERS = ["Name", "Role", "Default Partner"]
+PROJECT_SITE_HEADERS = ["Project", "City/Area"]
 
 PROJECT_COL = 7
 STATUS_COL = 9
@@ -19,13 +23,14 @@ SCHEDULED_COL = 10
 ASSIGNED_TO_COL = 11
 LAST_CONTACTED_COL = 12
 CALL_TYPE_COL = 13
-EMERGENCY_COL = 14
-LOCATE_REQUESTED_COL = 15
-LOCATE_CLEAR_COL = 16
-EARLIEST_DIG_COL = 17
-JOB_CATEGORY_COL = 18
-ESTIMATED_DURATION_COL = 19
-ESTIMATED_END_DATE_COL = 20
+SOURCE_COL = 14
+EMERGENCY_COL = 15
+LOCATE_REQUESTED_COL = 16
+LOCATE_CLEAR_COL = 17
+EARLIEST_DIG_COL = 18
+JOB_CATEGORY_COL = 19
+ESTIMATED_DURATION_COL = 20
+ESTIMATED_END_DATE_COL = 21
 
 STATUSES = {
     "1": "Open",
@@ -50,6 +55,12 @@ CALL_TYPES = {
     "11": "Irrigation Repair",
 }
 
+SOURCES = {
+    "1": "Phone",
+    "2": "Text",
+    "3": "Email",
+}
+
 # Call types that always require an 811 locate — the 3-business-day calculation
 # runs automatically, no need to ask.
 AUTO_LOCATE_CALL_TYPES = {
@@ -68,6 +79,11 @@ ASK_LOCATE_CALL_TYPES = {
 JOB_CATEGORIES = {
     "1": "Contract",
     "2": "Custom",
+}
+
+ROLES = {
+    "1": "Operator",
+    "2": "Labor",
 }
 
 
@@ -201,6 +217,14 @@ def prompt_call_type() -> str:
     return CALL_TYPES.get(choice, "")
 
 
+def prompt_source() -> str:
+    print("\nSource:")
+    for key, label in SOURCES.items():
+        print(f"{key}. {label}")
+    choice = input("Select source (1-3): ").strip()
+    return SOURCES.get(choice, "")
+
+
 def prompt_job_category() -> str:
     # Job Category only applies to the auto-locate install types.
     # Contract = 2 addresses per crew, same project, completed same-day (dig,
@@ -215,6 +239,14 @@ def prompt_job_category() -> str:
     return JOB_CATEGORIES.get(choice, "")
 
 
+def prompt_role() -> str:
+    print("\nRole:")
+    for key, label in ROLES.items():
+        print(f"{key}. {label}")
+    choice = input("Select role (1-2): ").strip()
+    return ROLES.get(choice, "")
+
+
 def format_call_line(row: list[str]) -> str:
     row = pad_row(row)
     scheduled = format_scheduled(row[SCHEDULED_COL])
@@ -224,7 +256,7 @@ def format_call_line(row: list[str]) -> str:
         f"Name: {row[2]} | "
         f"Company: {row[3]} | "
         f"Phone: {row[4]} | "
-        f"Reason: {row[8]} | "
+        f"Notes: {row[8]} | "
         f"Status: {row[STATUS_COL]} | "
         f"Scheduled: {scheduled}"
     )
@@ -355,6 +387,7 @@ def generate_id() -> int:
 
 
 def select_call(query: str) -> tuple[list[list[str]], list[str]] | tuple[None, None]:
+    # Returned row is already padded and aliased to rows — never reassign it via row = pad_row(row), that breaks the alias and write_rows(rows) silently won't save.
     matches = search_rows(query)
 
     if not matches:
@@ -431,6 +464,65 @@ def write_contacts(rows: list[list[str]]) -> None:
         csv.writer(file).writerows(rows)
 
 
+# --- employees ---
+
+def read_employees() -> list[list[str]]:
+    return read_rows(EMPLOYEE_FILE)
+
+
+def write_employees(rows: list[list[str]]) -> None:
+    with EMPLOYEE_FILE.open("w", newline="") as file:
+        csv.writer(file).writerows(rows)
+
+
+def add_employee(name: str, role: str, default_partner: str = "") -> None:
+    for row in read_employees():
+        if row and len(row) >= 1 and row[0].strip().lower() == name.strip().lower():
+            return
+
+    file_exists = EMPLOYEE_FILE.exists()
+    with EMPLOYEE_FILE.open("a", newline="") as file:
+        writer = csv.writer(file)
+        if not file_exists:
+            writer.writerow(EMPLOYEE_HEADERS)
+        writer.writerow([name, role, default_partner])
+
+
+# --- project sites ---
+
+def read_project_sites() -> list[list[str]]:
+    return read_rows(PROJECT_SITES_FILE)
+
+
+def write_project_sites(rows: list[list[str]]) -> None:
+    with PROJECT_SITES_FILE.open("w", newline="") as file:
+        csv.writer(file).writerows(rows)
+
+
+def find_project_site(project: str) -> str:
+    for row in read_project_sites():
+        if row and len(row) >= 2 and row[0].strip().lower() == project.strip().lower():
+            return row[1]
+    return ""
+
+
+def ensure_project_site(project: str) -> None:
+    # Called once per resolved Project in log_call(). If the project isn't in
+    # project_sites.csv yet, ask once for its City/Area and save it — a Project
+    # already on file is never asked again.
+    if not project or find_project_site(project):
+        return
+
+    city = input(f"What city/area is this project in? ({project}): ").strip()
+
+    file_exists = PROJECT_SITES_FILE.exists()
+    with PROJECT_SITES_FILE.open("a", newline="") as file:
+        writer = csv.writer(file)
+        if not file_exists:
+            writer.writerow(PROJECT_SITE_HEADERS)
+        writer.writerow([project, city])
+
+
 def find_or_create_contact(phone: str) -> dict | None:
     contacts = read_contacts()
     index = find_contact_index(phone)
@@ -459,10 +551,11 @@ def create_call_record(
     email: str,
     address: str,
     project: str,
-    reason: str,
+    notes: str,
     status: str,
     scheduled: str,
     call_type: str = "",
+    source: str = "",
     emergency: str = "",
     locate_requested: str = "",
     locate_clear: str = "",
@@ -480,12 +573,13 @@ def create_call_record(
         email,
         address,
         project,
-        reason,
+        notes,
         status,
         scheduled,
         "",              # Assigned To
         "",              # Last Contacted
         call_type,
+        source,
         emergency,
         locate_requested,
         locate_clear,
@@ -510,6 +604,8 @@ def log_call():
     print("\n--- Construction Call Tracker ---\n")
 
     phone = prompt_phone("Phone Number: ")
+
+    source = prompt_source()
 
     saved_contact = find_or_create_contact(phone)
 
@@ -585,27 +681,13 @@ def log_call():
     if not project:
         project = input("Project: ")
 
+    ensure_project_site(project)
+
     address = input("Address: ")
-    reason = input("Reason for call: ")
     call_type = prompt_call_type()
-    emergency = input("Emergency (Y/N): ").strip().upper()
-    status = prompt_status()
 
-    schedule = input("\nSchedule follow-up? (y/n): ").lower().strip()
+    schedule = input("\nSet a scheduled date for this job? (y/n): ").lower().strip()
     scheduled = prompt_scheduled() if schedule == "y" else ""
-
-    today = datetime.now().date()
-    if call_type in AUTO_LOCATE_CALL_TYPES:
-        locate_requested, locate_clear, earliest_dig = calculate_locate_dates(emergency, today)
-    elif call_type in ASK_LOCATE_CALL_TYPES:
-        needs_locate = input("Does this repair need a locate? (y/n): ").lower().strip()
-        if needs_locate == "y":
-            locate_requested, locate_clear, earliest_dig = calculate_locate_dates(emergency, today)
-        else:
-            locate_requested, locate_clear, earliest_dig = "", "", ""
-    else:
-        # e.g. Bid Work — no digging happens at this stage, no locate logic at all
-        locate_requested, locate_clear, earliest_dig = "", "", ""
 
     job_category = ""
     estimated_duration = ""
@@ -640,9 +722,27 @@ def log_call():
             if start:
                 estimated_end_date = add_business_days(start.date(), duration - 1).strftime("%Y-%m-%d")
 
+    emergency = input("Emergency (y/n): ").strip().upper()
+
+    today = datetime.now().date()
+    if call_type in AUTO_LOCATE_CALL_TYPES:
+        locate_requested, locate_clear, earliest_dig = calculate_locate_dates(emergency, today)
+    elif call_type in ASK_LOCATE_CALL_TYPES:
+        needs_locate = input("Does this repair need a locate? (y/n): ").lower().strip()
+        if needs_locate == "y":
+            locate_requested, locate_clear, earliest_dig = calculate_locate_dates(emergency, today)
+        else:
+            locate_requested, locate_clear, earliest_dig = "", "", ""
+    else:
+        # e.g. Bid Work — no digging happens at this stage, no locate logic at all
+        locate_requested, locate_clear, earliest_dig = "", "", ""
+
+    notes = input("Notes: ")
+    status = prompt_status()
+
     create_call_record(
-        phone, name, company, email, address, project, reason, status, scheduled,
-        call_type, emergency, locate_requested, locate_clear, earliest_dig,
+        phone, name, company, email, address, project, notes, status, scheduled,
+        call_type, source, emergency, locate_requested, locate_clear, earliest_dig,
         job_category, estimated_duration, estimated_end_date,
     )
 
@@ -705,7 +805,7 @@ def open_queue():
 
 def search_call():
     print("\n--- SEARCH CALLS ---\n")
-    query = input("Search by name, phone, company, or reason: ").lower().strip()
+    query = input("Search by name, phone, company, or notes: ").lower().strip()
 
     rows = get_call_rows()
     if not rows:
@@ -725,7 +825,7 @@ def search_call():
 
 def edit_call():
     print("\n--- EDIT CALL ---\n")
-    query = input("Search call (name, phone, company, reason): ").lower().strip()
+    query = input("Search call (name, phone, company, notes): ").lower().strip()
 
     rows, row = select_call(query)
     if row is None:
@@ -742,7 +842,7 @@ def edit_call():
     print("4. Email")
     print("5. Address")
     print("6. Project")
-    print("7. Reason")
+    print("7. Notes")
     print("8. Status")
     print("9. Mark as Completed")
     print("10. Set Schedule")
@@ -764,27 +864,23 @@ def edit_call():
     elif action == "6":
         row[PROJECT_COL] = input("Enter new project: ")
     elif action == "7":
-        row[8] = input("Enter new reason: ")
+        row[8] = input("Enter new notes: ")
     elif action == "8":
-        row = pad_row(row)
         row[STATUS_COL] = prompt_status()
     elif action == "9":
-        row = pad_row(row)
         row[STATUS_COL] = "Completed"
         write_rows(rows)
         print("\n✅ Call marked as Completed!")
         pause()
         return
     elif action == "10":
-        row = pad_row(row)
         row[SCHEDULED_COL] = prompt_scheduled()
         write_rows(rows)
         print("\n✅ Schedule updated!")
         pause()
         return
     elif action == "11":
-        row = pad_row(row)
-        row[11] = input("Assign to: ")
+        row[ASSIGNED_TO_COL] = input("Assign to: ")
     elif action == "12":
         pause()
         return
@@ -806,14 +902,13 @@ def edit_call():
 
 def mark_complete():
     print("\n--- MARK CALL AS COMPLETED ---\n")
-    query = input("Search call (name, phone, company, reason): ").lower().strip()
+    query = input("Search call (name, phone, company, notes): ").lower().strip()
 
     rows, row = select_call(query)
     if row is None:
         pause()
         return
 
-    row = pad_row(row)
     if row[STATUS_COL] == "Completed":
         print("\nThis call is already marked as Completed.")
         pause()
@@ -824,7 +919,6 @@ def mark_complete():
         pause()
         return
 
-    row = pad_row(row)
     row[STATUS_COL] = "Completed"
     write_rows(rows)
     print("\n✅ Call marked as Completed!")
@@ -833,7 +927,7 @@ def mark_complete():
 
 def schedule_call():
     print("\n--- SCHEDULE CALL ---\n")
-    query = input("Search call (name, phone, company, reason): ").lower().strip()
+    query = input("Search call (name, phone, company, notes): ").lower().strip()
 
     rows, row = select_call(query)
     if row is None:
@@ -843,7 +937,6 @@ def schedule_call():
     print("\nSelected Call:")
     print(format_call_detail(row))
 
-    row = pad_row(row)
     row[SCHEDULED_COL] = prompt_scheduled()
     write_rows(rows)
 
@@ -1114,6 +1207,183 @@ def contact_manager():
             print("Invalid choice.")
 
 
+def view_employees():
+    print("\n--- EMPLOYEE LIST ---\n")
+
+    employees = read_employees()[1:]
+    if not employees:
+        print("No employees found.")
+        pause()
+        return
+
+    for row in employees:
+        if len(row) < 2:
+            continue
+        partner = row[2] if len(row) > 2 else ""
+        print(f"Name: {row[0]} | Role: {row[1]} | Default Partner: {partner}")
+
+    pause()
+
+
+def add_employee_entry():
+    print("\n--- ADD EMPLOYEE ---\n")
+
+    name = input("Name: ")
+    role = prompt_role()
+    default_partner = input("Default Partner (optional): ")
+
+    add_employee(name, role, default_partner)
+    print("\n✅ Employee added!")
+    pause()
+
+
+def edit_employee():
+    print("\n--- EDIT EMPLOYEE ---\n")
+    query = input("Search by name: ").lower().strip()
+
+    employees = read_employees()
+    if len(employees) <= 1:
+        print("No employees found.")
+        pause()
+        return
+
+    matches = search_in_rows(employees[1:], query)
+    if not matches:
+        print("No matching employees found.")
+        pause()
+        return
+
+    print("\nMatching Employees:\n")
+    for i, row in enumerate(matches, start=1):
+        partner = row[2] if len(row) > 2 else ""
+        print(f"{i}. {row[0]} | {row[1]} | Default Partner: {partner}")
+
+    choice = input("\nSelect employee: ")
+    if not choice.isdigit():
+        print("Invalid selection.")
+        pause()
+        return
+
+    idx = int(choice) - 1
+    if idx < 0 or idx >= len(matches):
+        print("Invalid selection.")
+        pause()
+        return
+
+    selected = matches[idx]
+
+    print("\nWhat would you like to edit?")
+    print("1. Name")
+    print("2. Role")
+    print("3. Default Partner")
+    print("4. Cancel")
+
+    action = input("\nSelect option: ")
+
+    if action == "1":
+        selected[0] = input("New name: ")
+    elif action == "2":
+        selected[1] = prompt_role()
+    elif action == "3":
+        while len(selected) < 3:
+            selected.append("")
+        selected[2] = input("New default partner: ")
+    elif action == "4":
+        pause()
+        return
+    else:
+        print("Invalid option.")
+        pause()
+        return
+
+    write_employees(employees)
+    print("\n✅ Employee updated!")
+    pause()
+
+
+def employee_manager():
+    while True:
+        print("\n--- EMPLOYEE MANAGER ---\n")
+        print("1. View Employees")
+        print("2. Add Employee")
+        print("3. Edit Employee")
+        print("4. Back")
+
+        choice = input("\nSelect option: ")
+
+        if choice == "1":
+            view_employees()
+        elif choice == "2":
+            add_employee_entry()
+        elif choice == "3":
+            edit_employee()
+        elif choice == "4":
+            break
+        else:
+            print("Invalid choice.")
+
+
+def dispatch_view():
+    # Crew assignment is finalized around 3PM Mountain Time daily — this view is
+    # for end-of-day planning, not real-time dispatch. It only lists calls for
+    # a human to review; it never writes Assigned To itself (that still happens
+    # through Edit Call).
+    print("\n--- DISPATCH ---\n")
+
+    today = datetime.now().date()
+    rows = get_call_rows()
+
+    print("--- Morning: Installs Scheduled Today ---\n")
+    morning_calls = [
+        row for row in rows
+        if pad_row(row)[CALL_TYPE_COL] in AUTO_LOCATE_CALL_TYPES
+        and (scheduled := parse_scheduled(pad_row(row)[SCHEDULED_COL]))
+        and scheduled.date() == today
+    ]
+
+    if not morning_calls:
+        print("No installs scheduled for today.\n")
+    else:
+        for row in morning_calls:
+            row = pad_row(row)
+            print(f"Project: {row[PROJECT_COL]} | Address: {row[6]} | Assigned To: {row[ASSIGNED_TO_COL]}")
+        print()
+
+    print("--- Afternoon: Open Repairs by City/Area ---\n")
+    repair_calls = [
+        row for row in rows
+        if is_active(row) and pad_row(row)[CALL_TYPE_COL] in ASK_LOCATE_CALL_TYPES
+    ]
+
+    if not repair_calls:
+        print("No open repair calls.")
+    else:
+        emergency_calls = [row for row in repair_calls if pad_row(row)[EMERGENCY_COL] == "Y"]
+        other_calls = [row for row in repair_calls if pad_row(row)[EMERGENCY_COL] != "Y"]
+
+        if emergency_calls:
+            print("EMERGENCY:\n")
+            for row in emergency_calls:
+                row = pad_row(row)
+                city = find_project_site(row[PROJECT_COL]) or "Unknown"
+                print(f"  Project: {row[PROJECT_COL]} | Address: {row[6]} | City/Area: {city} | Notes: {row[8]}")
+            print()
+
+        grouped: dict[str, list] = {}
+        for row in other_calls:
+            row = pad_row(row)
+            city = find_project_site(row[PROJECT_COL]) or "Unknown"
+            grouped.setdefault(city, []).append(row)
+
+        for city in sorted(grouped):
+            print(f"{city}:\n")
+            for row in grouped[city]:
+                print(f"  Project: {row[PROJECT_COL]} | Address: {row[6]} | Notes: {row[8]}")
+            print()
+
+    pause()
+
+
 def main():
     ensure_call_file_schema()
 
@@ -1127,7 +1397,9 @@ def main():
         print("6. Dashboard")
         print("7. Scheduling")
         print("8. Contact Manager")
-        print("9. Exit")
+        print("9. Employee Manager")
+        print("10. Dispatch")
+        print("11. Exit")
 
         choice = input("\nSelect option: ")
 
@@ -1148,6 +1420,10 @@ def main():
         elif choice == "8":
             contact_manager()
         elif choice == "9":
+            employee_manager()
+        elif choice == "10":
+            dispatch_view()
+        elif choice == "11":
             break
         else:
             print("\nInvalid choice — try again.")
