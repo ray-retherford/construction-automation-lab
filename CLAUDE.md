@@ -135,6 +135,11 @@ Phase 3: Google Sheets sync — push Master Schedule (New Installs / Repairs) an
   Also includes Gmail parsing for incoming call/order sources: customer emails, municipality
   emails, and SupplyPro order emails — SupplyPro delivers contract work orders via email
   (not a live API), so this is an email-parsing task, not a separate integration.
+  Also includes: match Google Form submission (by Address) to the open call record,
+  auto-set Status to Completed, and send an automatic customer notification (email or
+  text) that the job is done — currently this only happens manually and only for
+  customers who explicitly asked, which means most customers get no completion notice
+  at all.
 Phase 4: Web dashboard — replace terminal menu with a simple browser UI
 Phase 5: AI agent layer — answer phone, create call record, assign schedule, send texts,
   update Sheets
